@@ -28,6 +28,7 @@ import pandas as pd
 
 from {{package_name}} import utils
 from {{package_name}}.models_training.model_tfidf_sgdc import ModelTfidfSgdc
+from {{package_name}}.models_training.utils_super_documents import TfidfVectorizerSuperDocuments
 
 # Disable logging
 import logging
@@ -102,10 +103,20 @@ class ModelTfidfSgdcTests(unittest.TestCase):
         self.assertEqual(model.multi_label, True)
         remove_dir(model_dir)
 
+        # Check with super documents
+        model = ModelTfidfSgdc(model_dir=model_dir, with_super_documents=True)
+        self.assertEqual(model.with_super_documents, True)
+        remove_dir(model_dir)
+
         # Error
         with self.assertRaises(ValueError):
             model = ModelTfidfSgdc(model_dir=model_dir, sgdc_params={'loss': 'squared_hinge', 'max_iter': 50}, multi_label=False, multiclass_strategy='toto')
         remove_dir(model_dir)
+
+        with self.assertRaises(ValueError):
+            model = ModelTfidfSgdc(model_dir=model_dir, multi_label=True, with_super_documents=True)
+        remove_dir(model_dir)
+
 
     def test02_model_tfidf_sgdc_predict(self):
         '''Test of the method predict of {{package_name}}.models_training.model_tfidf_sgdc.ModelTfidfSgdc'''
@@ -194,6 +205,20 @@ class ModelTfidfSgdcTests(unittest.TestCase):
         self.assertEqual([elem for elem in preds], [elem for elem in model.predict(['test'], return_proba=False)[0]])
         proba = model.predict(x_train, return_proba=True)
         self.assertEqual(proba.shape, (len(x_train), len(cols)))
+        proba = model.predict('test', return_proba=True)
+        self.assertEqual([elem for elem in proba], [elem for elem in model.predict(['test'], return_proba=True)[0]])
+        remove_dir(model_dir)
+
+        # Mono-label - with super documents
+        model = ModelTfidfSgdc(model_dir=model_dir, multi_label=False, multiclass_strategy=None, with_super_documents=True)
+        model.fit(x_train, y_train_mono)
+        self.assertTrue(isinstance(model.tfidf, TfidfVectorizerSuperDocuments))
+        preds = model.predict(x_train, return_proba=False)
+        self.assertEqual(preds.shape, (len(x_train),))
+        preds = model.predict('test', return_proba=False)
+        self.assertEqual(preds, model.predict(['test'], return_proba=False)[0])
+        proba = model.predict(x_train, return_proba=True)
+        self.assertEqual(proba.shape, (len(x_train), n_classes))
         proba = model.predict('test', return_proba=True)
         self.assertEqual([elem for elem in proba], [elem for elem in model.predict(['test'], return_proba=True)[0]])
         remove_dir(model_dir)
@@ -471,6 +496,7 @@ class ModelTfidfSgdcTests(unittest.TestCase):
         self.assertEqual(model.multiclass_strategy, new_model.multiclass_strategy)
         self.assertEqual(model.tfidf.get_params(), tfidf.get_params())
         self.assertEqual(model.sgdc.get_params(), sgdc.get_params())
+        self.assertEqual(model.with_super_documents, new_model.with_super_documents)
         # We can't really test the pipeline so we test predictions
         self.assertEqual([list(_) for _ in model.predict_proba(x_test)], [list(_) for _ in new_model.predict_proba(x_test)])
         remove_dir(model_dir)
@@ -607,7 +633,6 @@ class ModelTfidfSgdcTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             new_model = ModelTfidfSgdc()
             new_model.reload_from_standalone(configuration_path=conf_path, sklearn_pipeline_path='toto.pkl')
-
 
 # Perform tests
 if __name__ == '__main__':

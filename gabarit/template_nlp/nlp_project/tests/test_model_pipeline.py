@@ -70,6 +70,14 @@ class ModelPipelineTests(unittest.TestCase):
         model.display_if_gpu_activated()
         remove_dir(model_dir)
 
+        # test with super documents
+        model = ModelPipeline(model_dir=model_dir)
+        self.assertFalse(model.with_super_documents)
+        remove_dir(model_dir)
+        model = ModelPipeline(model_dir=model_dir, with_super_documents=True)
+        self.assertTrue(model.with_super_documents)
+        remove_dir(model_dir)
+
         tfidf = TfidfVectorizer()
         svc = LinearSVC()
         pipeline = Pipeline([('tfidf', tfidf), ('svc', svc)])
